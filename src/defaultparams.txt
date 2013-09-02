@@ -1,0 +1,32 @@
+{
+    "version"     : "0.1",
+    "date"        : "2013-08-13",
+    "_comment" : "sections: settings, triggering, communications, state, commands",
+    "settings" : 
+    {
+        "sample rate" : 4000,
+        "record length" : 4,
+        "gain" : [ 1.0, 1.0, 1.0, 2.0],
+        "_comment_source" : "internal, external, off",
+        "source" : [ "internal", "internal", "internal", "internal"]
+    },
+    "triggering" : 
+    {
+        "enable hour" : 0,
+        "enable length" : 24,
+        "trigger type" : "modulo",
+        "modulo units" : "minutes",
+        "modulo value" : 2,
+        "absolute times" : [ "2013-10-10T10:10:00", "2013-11-11T11:11:00"]
+    },
+    "communications" :
+    {
+        "wifi tx mode" : [1, 1, 1, 0],
+        "wifi tx compress" : false,
+        "_comment_wifi_tx_window" : "start and stop times in ms. -1 = end of record",
+        "wifi tx window" : [0, -1]
+    }
+}
+
+
+
