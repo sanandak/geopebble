@@ -46,7 +46,7 @@ static void sigalrmHandler()
 {
     gotAlarm = 1;
 }
-/* child exited - reap */
+/* child exited - reap it so it doesn't turn into zombie*/
 static void sigchldHandler()
 {
     while(waitpid(-1, NULL, WNOHANG) > 0)
@@ -72,12 +72,15 @@ int timeToTrig(struct param_st pm, struct gps_st gpsStat, struct timeval *trigTi
     time_t tt;
 
     gettimeofday(&currTime, NULL);
+    // convert curr time to 2 broken down time structs, tm and trigtm
     gmtime_r(&currTime.tv_sec, &tm);
     gmtime_r(&currTime.tv_sec, &trigtm);
     tm.tm_isdst = 0;
     trigtm.tm_isdst = 0;
 
-
+    /* if trigger is MODULO, you need the modulo units (s, min, hrs,
+       etc) and the modulo value, mv.  Based on that determine the
+       epoch second for triggering */
     if(pm.triggerType == MODULO) {
 	// check that we are inside our window of valid triggering times.
 	if(tm.tm_hour < pm.enableHour || tm.tm_hour > pm.enableHour+pm.enableLength)
@@ -255,7 +258,9 @@ int main(int argc, char *argv[]) {
 	}
 	
 	// ok, set the timer to 1 second before trigTime
-	//
+	// when timer expires, the sig sigalrm will be raised
+	// which has a handler (sigalrmHandler)
+	// that sets gotAlarm, which will spawn gp_store below...
 	if(dt > 0) {
 	    if(gettimeofday(&currTime, NULL) == -1)
 		errExit("sched: gettime");
@@ -287,16 +292,14 @@ int main(int argc, char *argv[]) {
 		    if(debug)
 			printf("sched: got alrm: %ld\n", time(NULL));
 		    int sockfd_store;
+		    // spawn gp_store...
 		    int pid = run_gp_store(argc, argv, &sockfd_store);
 		    if(pid < 0)
 			errExit("sched: couldn't run gp_store");
-		    struct trig_st { // FIXME - this should be in geopebble.h
-			struct timeval trigTime;
-			struct param_st theParams;
-		    } theTrig;
+		    struct trig_st theTrig;
 		    theTrig.theParams = theParams;
 		    theTrig.trigTime = trigTime;
-		    // send the parameters for triggering. 
+		    // ... and send the parameters for triggering. 
 		    if((ret=write(sockfd_store, &theTrig, sizeof(theTrig))) == -1)
 			errExit("gp: writing params to scheduler failed");
 		}
