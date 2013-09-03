@@ -17,6 +17,9 @@ geopebble: geopebble.o $(OBJS)
 gp_base: gp_base.o $(OBJS)
 	$(LINK) $^ $(LDFLAGS) -o $@
 
+gp_qc: gp_qc.o $(OBJS)
+	$(LINK) $^ -L../../SU/lib -lcwp -I../../SU/include $(LDFLAGS) -o $@
+
 gp_sched: gp_sched.o $(OBJS)
 	$(LINK) $^ $(LDFLAGS) -lm -o $@
 
