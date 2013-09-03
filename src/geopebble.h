@@ -126,14 +126,24 @@ struct trig_st {
     struct param_st theParams;
 };
 
-/* transmit a UDP packet every TXSAMPS samps */
-#define TXSAMPS 250 
+/* udppkt_st has a zero length array as the last element.  This allows
+   for variable size struct, but the length of the array has to be
+   included in the struct */
 struct udppkt_st {
-    int ch;
-    time_t tPPS;
-    unsigned int cntAtSamp0;
-    float d[TXSAMPS];
+    struct timeval t0;
+    float dt;
+    int   ns;
+    int   ch;
+    //    unsigned int cntAtSamp0;
+    float d[];
 };
+//#define TXSAMPS 250 
+//struct udppkt_st {
+//    int ch;
+//    time_t tPPS;
+//    unsigned int cntAtSamp0;
+//    float d[TXSAMPS];
+//};
 
 
 /* shared memory from ADC */
