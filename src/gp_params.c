@@ -140,6 +140,101 @@ int updateJSON(cJSON *oldroot, cJSON *sec, cJSON *obj) {
     cJSON_AddItemReferenceToObject(oldsec, item, obj);
     return(0);
 }
+
+/* paramToJSON */
+int paramToJSON(struct param_st p, cJSON *root) {
+    /* sections in the params file */
+    cJSON *settings = cJSON_CreateObject();
+    cJSON *triggering = cJSON_CreateObject();
+    cJSON *communications = cJSON_CreateObject();
+    
+    /* arrays that will be populated */
+    cJSON *source = cJSON_CreateArray();
+    cJSON *absTimes = cJSON_CreateArray();
+    
+    int i;
+    
+    /* populate the `settings' object */
+    cJSON_AddItemToObject(root, "settings", settings);
+    cJSON_AddNumberToObject(settings, "sample rate", p.sampleRate);
+    cJSON_AddNumberToObject(settings, "record length", p.recordLength);
+    cJSON_AddItemToObject(settings, "gain", cJSON_CreateFloatArray(p.gain, 4));
+
+    /* populate the source array - array of strings */
+    for(i=0;i<4;i++) {
+	switch(p.source[i]) {
+	case INTERNAL:
+	    cJSON_AddItemToArray(source, cJSON_CreateString("internal"));
+	    break;
+	case EXTERNAL:
+	    cJSON_AddItemToArray(source, cJSON_CreateString("external"));
+	    break;
+	case OFF:
+	    cJSON_AddItemToArray(source, cJSON_CreateString("off"));
+	    break;
+	default:
+	    cJSON_AddItemToArray(source, cJSON_CreateString("internal"));
+	    break;
+	}
+    }
+    // and add the source array to the settings object
+    cJSON_AddItemToObject(settings, "source", source);
+
+    /* populate the `triggering' object */
+    cJSON_AddItemToObject(root, "triggering", triggering);
+    cJSON_AddNumberToObject(triggering, "enable hour", p.enableHour);
+    cJSON_AddNumberToObject(triggering, "enable length", p.enableLength);
+    
+    switch(p.triggerType) {
+    case MODULO:
+	cJSON_AddStringToObject(triggering, "trigger type", "modulo");
+	break;
+    case ABSOLUTE:
+	cJSON_AddStringToObject(triggering, "trigger type", "absolute");
+	break;
+    case CONTINUOUS:
+	cJSON_AddStringToObject(triggering, "trigger type", "continuous");
+	break;
+    case IMMEDIATE:
+	cJSON_AddStringToObject(triggering, "trigger type", "immediate");
+	break;
+    default:
+	cJSON_AddStringToObject(triggering, "trigger type", "modulo");
+	break;
+    }
+
+    switch(p.triggerModuloUnits) {
+    case SECONDS:
+	cJSON_AddStringToObject(triggering, "modulo units", "seconds");
+	break;
+    case MINUTES:
+	cJSON_AddStringToObject(triggering, "modulo units", "minutes");
+	break;
+    case HOURS:
+	cJSON_AddStringToObject(triggering, "modulo units", "hours");
+	break;
+    default:
+	cJSON_AddStringToObject(triggering, "modulo units", "minutes");
+	break;
+    }
+
+    cJSON_AddNumberToObject(triggering, "modulo value", p.triggerModuloValue);    
+    for(i=0; i<p.nAbsoluteTimes; i++) {
+	char t[128];
+	struct tm *g = gmtime(&p.absoluteTimes[i]); // convert to brokendown t
+	strftime(t, 128, "%FT%T", g);
+	cJSON_AddItemToArray(absTimes, cJSON_CreateString(t));
+    }
+    cJSON_AddItemToObject(triggering, "absolute times", absTimes);
+
+    cJSON_AddItemToObject(root, "communications", communications);
+    cJSON_AddItemToObject(communications, "wifi tx mode", cJSON_CreateIntArray(p.wifiTxMode, 4));
+    cJSON_AddNumberToObject(communications, "wifi tx compress", p.wifiTxCompress);
+    cJSON_AddItemToObject(communications, "wifi tx window", cJSON_CreateIntArray(p.wifiTxWindow, 2));
+
+    
+}
+
 /*
  * parseJSONFile - read from the file and set params.
  *
@@ -216,16 +311,20 @@ void parse_object(cJSON *item, struct param_st *theParams) {
 
 /* long list of if statements to handle the json object and set the params */	
 void handle_item(cJSON *item, struct param_st *theParams) {
+    int gotit=0;
 
     if(debug)
 	printf("item = %s\n", item->string);
 
     if(strcmp(item->string, "sample rate") == 0) {
 	theParams->sampleRate = item->valueint;
+	gotit=1;
     }
 
-    if(strcmp(item->string, "record length") == 0)
+    if(strcmp(item->string, "record length") == 0) {
 	theParams->recordLength = item->valueint;
+	gotit=1;
+    }
 
     if(strcmp(item->string, "gain") == 0) {  // gain could be array or single value (applied to all)
 	if(item->type == cJSON_Array) {
@@ -240,6 +339,7 @@ void handle_item(cJSON *item, struct param_st *theParams) {
 	    theParams->gain[2] = g;
 	    theParams->gain[3] = g;
 	}
+	gotit=1;
     }
 
     if(strcmp(item->string, "source") == 0) {
@@ -266,13 +366,16 @@ void handle_item(cJSON *item, struct param_st *theParams) {
 	    for(i=0; i<4; i++)
 		theParams->source[i] = s;
 	}
+	gotit=1;
     }
 
     if(strcmp(item->string, "enable hour") == 0) {
 	theParams->enableHour = item->valueint;
+	gotit=1;
     }
     if(strcmp(item->string, "enable length") == 0) {
 	theParams->enableLength = item->valueint;
+	gotit=1;
     }
 
     if(strcmp(item->string, "trigger type") == 0) {
@@ -284,6 +387,7 @@ void handle_item(cJSON *item, struct param_st *theParams) {
 	    theParams->triggerType = CONTINUOUS;
 	else // default if unrecognized??
 	    theParams->triggerType = IMMEDIATE;
+	gotit=1;
     }
 
     if(strcmp(item->string, "modulo units") == 0) {
@@ -293,10 +397,12 @@ void handle_item(cJSON *item, struct param_st *theParams) {
     	    theParams->triggerModuloUnits = SECONDS;
 	else // default
 	    theParams->triggerModuloUnits = MINUTES;
+	gotit=1;
     }
     
     if(strcmp(item->string, "modulo value") == 0) {
 	theParams->triggerModuloValue = item->valueint;
+	gotit=1;
     }
     
     if(strcmp(item->string, "absolute times") == 0) {
@@ -318,6 +424,7 @@ void handle_item(cJSON *item, struct param_st *theParams) {
 		}
 	    }
 	}
+	gotit=1;
     }
 
     if(strcmp(item->string, "wifi tx mode") == 0) {  // 
@@ -333,21 +440,25 @@ void handle_item(cJSON *item, struct param_st *theParams) {
 	    theParams->wifiTxMode[2] = m;
 	    theParams->wifiTxMode[3] = m;
 	}
+	gotit=1;
     }
     
     if(strcmp(item->string, "wifi tx compress") == 0) {
-	theParams->wifiTxCompression = item->type; // boolean true or false...
+	theParams->wifiTxCompress = item->type; // boolean true or false...
+	gotit=1;
     }
     
     if(strcmp(item->string, "wifi tx window") == 0) {
-	theParams->wifiWindow[0] = cJSON_GetArrayItem(item, 0)->valueint;
-	theParams->wifiWindow[1] = cJSON_GetArrayItem(item, 1)->valueint;
+	theParams->wifiTxWindow[0] = cJSON_GetArrayItem(item, 0)->valueint;
+	theParams->wifiTxWindow[1] = cJSON_GetArrayItem(item, 1)->valueint;
 	/* do this when this param is used.  recordLength could change...
-	   if(theParams->wifiWindow[1] < 0)
-	   theParams->wifiWindow[1] = theParams->recordLength;
+	   if(theParams->wifiTxWindow[1] < 0)
+	   theParams->wifiTxWindow[1] = theParams->recordLength;
 	*/
+	gotit=1;
     }
+    if(!gotit && debug)
+	printf("unrecognized json item >%s<\n", item->string);
 }
-
 
 /* gp_params.c ends here */

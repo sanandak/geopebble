@@ -22,16 +22,19 @@ enum modulounits {
     HOURS
 };
 
+/* there should be a one-to-one mapping between the JSON parameters
+   and this struct */
 struct param_st {
+    // section: settings
     int sampleRate;
     int recordLength;
     float gain[4];
     int  source[4];
-    //trigger is valid during these times of day
+    
+    // section: triggering
+    // trigger is valid during these times of day
     int  enableHour;
     int  enableLength;
-
-    //triggering
     int  triggerType;
     //modulo
     int     triggerModuloUnits;
@@ -39,10 +42,11 @@ struct param_st {
     //absolute
     int     nAbsoluteTimes;
     time_t  *absoluteTimes;
-    //wifi
+
+    // section: communications
     int     wifiTxMode[4];
-    int     wifiTxCompression;
-    int     wifiWindow[2];
+    int     wifiTxCompress;
+    int     wifiTxWindow[2];
 };
 
 #define DEFAULT_PARAMS_FILE "defaultparams.txt"

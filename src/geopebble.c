@@ -65,8 +65,9 @@ int_handler()
 }
 
 /* Functions */
-int run_gp_gps(int mainc, char *mainv[]);
 int run_gp_sched(int mainc, char *mainv[], int *sockfd);
+void setHardwareParams(struct param_st theParams);
+
 /* Main */
 
 int main(int argc, char *argv[]) {
@@ -128,16 +129,6 @@ int main(int argc, char *argv[]) {
     //    sigaction(SIGPIPE, &act, 0);
     //    sigaction(SIGUSR1, &act, 0);
 
-    /* /\* run gp_gps *\/ */
-    /* if(forkgps) {  */
-    /* 	if((gpspid=run_gp_gps(argc, argv)) < 0) { // WARN no socketpair to GPS... */
-    /* 	    fprintf(stderr, "run_gp_gps failed"); */
-    /* 	    exit(EXIT_FAILURE); */
-    /* 	} */
-    /* 	if(debug) */
-    /* 	    printf("gp: started gp_gps: pid: %d\n", gpspid); */
-    /* } */
-
     /* run gp_sched */
     if(forksched) {
 	if((schedpid=run_gp_sched(argc, argv, &sockfd_sched)) < 0) {
@@ -153,9 +144,11 @@ int main(int argc, char *argv[]) {
     if(parseJSONFile(DEFAULT_PARAMS_FILE,  &theParams)) {
 	;; // error handler
     }
+    /* the params.txt file is the most-recently updated params */
     if(parseJSONFile("params.txt",  &theParams)) {
 	;; // error handler
     }
+    setHardwareParams(theParams);
     	
     /* set up select on the sockets */
     fdmax=STDIN_FILENO;
@@ -238,7 +231,7 @@ int main(int argc, char *argv[]) {
 	    	    errExit("gp: base sta read");
 		}
 		// gp_base has died...restart system?
-		if(numRead ==0) { 
+		if(numRead==0) { 
 		    errMsg("gp: base has died");
 		    FD_CLR(sfd, &readfds);
 		    break;
@@ -287,45 +280,11 @@ int main(int argc, char *argv[]) {
     exit(0);
 }
 
-
-/*
- * run_gp_gps - exec `gp_gps'
- *
- * return the PID of the exec-ed child or -1 on failed `fork'
- */
-
-int run_gp_gps(int mainc, char *mainv[]) 
-{
-    pid_t pktpid;
-
-    switch(pktpid=fork()) {
-    case -1:
-	return(-1);
-	break;
-    case 0:		/* child */
-	execl("./gp_gps", "gp_gps",  "-i", "-d", (char *)NULL);
-	//	execl("./gp_gps", "gp_gps",  (char *)NULL);
-
-	/* should never get here */
-	fprintf(stderr, "exec gp_adc failed: %m");
-	exit(EXIT_FAILURE);
-	break;
-
-    default:		/* parent */
-	break;
-    }
-    return(pktpid);
-}
-
-
 /*
  * run_gp_sched - exec `gp_sched' 
  *
  * return the PID of the exec-ed child or -1 on failed socketpair.
  */
-
-
-
 int run_gp_sched(int mainc, char *mainv[], int *sockfd_sched) 
 {
     int sockfd[2];
